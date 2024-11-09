@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: helloworld
+spec:
+  destination:
+    namespace: hello-world
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://pergon.github.io/Helm3/
+    targetRevision: '0.3.0'
+    chart: hello-world
+  project: default
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true

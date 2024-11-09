@@ -1,0 +1,57 @@
+notifications:
+  argocdUrl: https://localhost:8000
+  name: notifications-controller
+  notifiers:
+    service.telegram: |
+      token: $telegram-token
+  secret:
+    annotations: {}
+    create: true
+    items:
+      telegram-token: <token-do-bot>
+    labels: {}
+    name: argocd-notifications-secret
+ 
+  templates:
+    template.app-deployed: |
+      message: |
+        {{if eq .serviceType "telegram"}}✅{{end}} Aplicação {{.app.metadata.name}} está agora executando a nova versão dos manifestos de deployment.
+    template.app-health-degraded: |
+      message: |
+        {{if eq .serviceType "telegram"}}❗{{end}} A aplicação {{.app.metadata.name}} está degradada.
+        Detalhes da aplicação: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}.
+    template.app-sync-failed: |
+      message: |
+        {{if eq .serviceType "telegram"}}❗{{end}} A operação de sincronização da aplicação {{.app.metadata.name}} falhou em {{.app.status.operationState.finishedAt}} com o seguinte erro: {{.app.status.operationState.message}}
+        Detalhes da operação de sincronização disponíveis em: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true .
+    template.app-sync-succeeded: |
+      message: |
+        {{if eq .serviceType "telegram"}}✅{{end}} A aplicação {{.app.metadata.name}} foi sincronizada com sucesso em {{.app.status.operationState.finishedAt}}.
+        Detalhes da operação de sincronização disponíveis em: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true .
+
+  terminationGracePeriodSeconds: 30
+  tolerations: []
+  topologySpreadConstraints: []
+
+  triggers:
+    trigger.on-deployed: |
+      - description: Aplicação está sincronizada e saudável. Disparado uma vez por commit.
+        oncePer: app.status.sync.revision
+        send:
+          - app-deployed
+        when: app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+    trigger.on-health-degraded: |
+      - description: Aplicação está degradada
+        send:
+          - app-health-degraded
+        when: app.status.health.status == 'Degraded'
+    trigger.on-sync-failed: |
+      - description: Sincronização da aplicação falhou
+        send:
+          - app-sync-failed
+        when: app.status.operationState.phase in ['Error', 'Failed']
+    trigger.on-sync-succeeded: |
+      - description: Sincronização da aplicação foi bem-sucedida
+        send:
+          - app-sync-succeeded
+        when: app.status.operationState.phase in ['Succeeded']
